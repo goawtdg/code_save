@@ -1,0 +1,266 @@
+Metadata-Version: 2.4
+Name: safe-codegen
+Version: 0.1.0
+Summary: Multi-agent LangGraph-based safe code generation pipeline with layered defenses and progressive caching.
+Author-email: Your Name <you@example.com>
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: langchain>=0.3.0
+Requires-Dist: langgraph>=0.2.0
+Requires-Dist: langchain-openai>=0.1.0
+Requires-Dist: langchain-community>=0.3.0
+Requires-Dist: openai>=1.0.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: pydantic-settings>=2.0.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: sqlalchemy>=2.0.0
+Requires-Dist: structlog>=24.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
+Requires-Dist: autogen-agentchat>=0.4.0; extra == "dev"
+Requires-Dist: autogen-ext[openai]>=0.4.0; extra == "dev"
+
+### 项目简介
+
+`safe-codegen` 是一个基于 **LangGraph** 的三层多代理代码生成与防护系统，通过「分层防御 + 渐进式缓存」机制在保持高效代码生成的同时，降低病毒式污染风险。
+
+核心包含三层：
+- **Layer 1: 基座净化层** — 校验初始代码基座，生成形式化契约并锁定为不可变基座。
+- **Layer 2: 模块监督层** — FastCoder 风格模块增量生成与监督，支持版本化增量缓存与回滚。
+- **Layer 3: 全局收敛层** — 全局一致性校验、多代理投票、回归/风险评估，输出最终报告与结果。
+
+---
+
+### 一、使用 conda 创建并进入 `code_env`
+
+在 Windows PowerShell 中执行（确保已安装 Anaconda/Miniconda）：
+
+```powershell
+conda create -n code_env python=3.11 -y
+conda activate code_env
+```
+
+之后每次使用本项目前，只需：
+
+```powershell
+conda activate code_env
+```
+
+---
+
+### 二、安装依赖（pip 为主，uv 可选）
+
+#### 1. 使用 pip 安装
+
+在已激活的 `code_env` 环境下，进入本项目根目录（例如 `d:\py\code`）：
+
+```powershell
+cd d:\py\code
+pip install -e .
+```
+
+这会根据 `pyproject.toml` 安装运行所需依赖。
+
+如需安装开发/测试依赖（包括 pytest 等）：
+
+```powershell
+pip install -e .[dev]
+```
+
+#### 2. 可选：使用 uv 安装
+
+如果你习惯使用 `uv`，可以在已激活的 `code_env` 中先安装 `uv`：
+
+```powershell
+pip install uv
+```
+
+然后在项目根目录执行：
+
+```powershell
+uv pip install -e .
+uv pip install -e .[dev]
+```
+
+> 说明：项目的依赖声明仍以 `pyproject.toml` 为主，`uv` 只是更快的安装工具。
+
+---
+
+### 三、环境变量配置
+
+在项目根目录创建 `.env` 文件（或通过系统环境变量设置），至少配置：
+
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+如果使用本地 Ollama/Llama 模型，可额外配置：
+
+```env
+OLLAMA_HOST=http://127.0.0.1:11434
+OLLAMA_MODEL=llama3
+```
+
+**智谱 / DeepSeek（OpenAI 兼容 base_url）**
+
+使用智谱或 DeepSeek 时，设置 `SAFE_CODEGEN_BACKEND=openai` 并指定 base_url 与模型即可：
+
+```env
+SAFE_CODEGEN_BACKEND=openai
+OPENAI_API_KEY=你的智谱或DeepSeek的API_KEY
+
+# 智谱 GLM-4
+SAFE_CODEGEN_OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+SAFE_CODEGEN_OPENAI_MODEL=glm-4-flash
+
+# 或 DeepSeek（官网 / 阿里云百炼等）
+# SAFE_CODEGEN_OPENAI_BASE_URL=https://api.deepseek.com
+# SAFE_CODEGEN_OPENAI_MODEL=deepseek-chat
+```
+
+项目中的 LLM 适配层会根据配置自动选择 OpenAI、Ollama 或上述兼容端点。
+
+---
+
+### 四、核心目录结构（规划）
+
+项目采用 `src` layout：
+
+- `src/safe_codegen/` — 核心包
+  - `config.py` — 配置与阈值管理
+  - `llm/` — LLM 适配层（OpenAI、Ollama）
+  - `agents/` — 三层多代理逻辑
+  - `cache/` — 基座与增量缓存实现
+  - `graph/` — LangGraph 状态、节点与构建器
+  - `runner.py` — CLI 入口和 demo 流程
+- `tests/` — Pytest 测试
+
+后续文件会按上述规划逐步完善。
+
+---
+
+### 五、运行一个最小示例（待实现）
+
+在依赖安装完成、环境变量配置正确后，可以直接运行：
+
+```powershell
+safe-codegen --prompt "为一个 FastAPI TODO 应用生成安全的项目骨架"
+```
+
+或直接通过 Python 调用：
+
+```powershell
+python -m safe_codegen.runner --prompt "为一个 FastAPI TODO 应用生成安全的项目骨架"
+```
+
+你也可以使用自带脚本运行一个简单 demo：
+
+```powershell
+python scripts/run_demo.py
+```
+
+当前仓库已经提供一个 **可运行的三层 LangGraph demo**：当环境变量 `SAFE_CODEGEN_BACKEND=mock` 时，所有 LLM 调用都会使用本地 mock 后端，不依赖外部 API，方便在离线环境中验证整体流程。
+
+---
+
+### 六、运行测试
+
+在已安装开发依赖的前提下：
+
+```powershell
+pytest
+```
+
+部分测试会在未检测到 `OPENAI_API_KEY` 或本地 Ollama 服务时自动跳过真实模型调用，仅测试接口与数据流。
+
+---
+
+### 七、如何使用本项目（快速一览）
+
+| 步骤 | 操作 |
+|------|------|
+| 1. 环境 | `conda activate code_env`，在项目根目录执行 |
+| 2. 安装 | `pip install -e .` |
+| 3. 配置 | 在项目根目录建 `.env`，设置 `OPENAI_API_KEY=...`（或用 `SAFE_CODEGEN_BACKEND=ollama` + Ollama） |
+| 4. 运行 | `safe-codegen --prompt "你的任务描述"` 或 `python -m safe_codegen.runner --prompt "..."` |
+| 5. 离线试跑 | 设置 `SAFE_CODEGEN_BACKEND=mock` 后运行，不消耗外部 API |
+
+---
+
+### 八、多 API 交叉验证以节约 Token
+
+通过「主 API 生成 + 验证 API 关键节点把关」的方式，可以减少因误判导致的重试和重复调用，从而在保证质量的前提下节约 token。
+
+**策略简述：**
+
+- **主 API（便宜/本地）**：承担 Layer 1 基座校验、Layer 2 模块生成与初评等大量调用。
+- **验证 API（贵一点或另一家）**：仅在少数关键节点参与，用于交叉验证或投票；一致则通过，避免不必要的重试。
+
+**建议配置 2 个 API 即可：**
+
+1. **主后端**：`gpt-4o-mini` 或本地 Ollama，用于日常生成与初评。
+2. **验证后端**：在 Layer 3 全局收敛（或关键模块打分）时再调用一次更强模型或另一家 API；若与主后端结论一致，则直接通过，减少整条链路重试。
+
+**环境变量示例（需项目支持 `validation_backend` 时使用）：**
+
+```env
+# 主后端：日常生成与初评
+SAFE_CODEGEN_BACKEND=openai
+OPENAI_API_KEY=sk-...
+
+# 可选：验证用后端（仅 Layer 3 多一次调用，用于交叉验证）
+# SAFE_CODEGEN_VALIDATION_BACKEND=openai
+# SAFE_CODEGEN_OPENAI_VALIDATION_MODEL=gpt-4o
+```
+
+**节约 token 的原理：**
+
+- 少重试：关键节点双 API 一致则接受，减少 Layer 2 的 `max_module_retries` 被触发。
+- 分工明确：重计算放在便宜 API，贵 API 只做少量「盖章」式校验。
+- 可选：若配置了验证后端，仅在 Layer 3 做一次交叉验证即可，不必每层都双调。
+
+---
+
+### 九、省 Token 与基座合规实验方案（A/B 测试）
+
+用于验证「safe-codegen 是否省 token 且保持基座干净合规」：基线组（单次大模型生成）vs 实验组（本项目的三层流程），重复多轮取平均。
+
+**实验设计要点**
+
+| 项目 | 说明 |
+|------|------|
+| 任务 | 3 个可重复真实任务：① FastAPI TODO 完整项目（CRUD+SQLite）② JWT 认证中间件（不硬编码密钥）③ 文件上传 endpoint（防路径穿越+大小限制） |
+| 组别 | **基线组**：同一模型在 WebUI/代码里单次 prompt 生成；**实验组**：`run_once(prompt)` 跑完整三层流程 |
+| 记录 | 每轮：输入/输出/总 tokens、Bandit 安全违规数、foundation 是否变化、备注（如 status） |
+| 轮次 | 每任务每组跑 3 轮取平均（可调 `--rounds`） |
+| 多轮漂移（可选） | 用第 1 轮生成的 TODO 项目继续加 5 轮新功能；观察实验组 foundation 不变、tokens 第 2 轮起明显下降 |
+
+**一键运行实验脚本**
+
+在项目根目录（已安装依赖、配置好 `.env` 中的 API Key 与可选 base_url）：
+
+```powershell
+# 安装 bandit 以便统计安全违规数（可选）
+pip install bandit
+
+# 两组都跑，每任务 3 轮，结果写入 experiment_results.csv
+python scripts/run_experiment.py --rounds 3 --out experiment_results.csv
+
+# 只跑基线组、只跑第 0 个任务、1 轮（快速试跑）
+python scripts/run_experiment.py --rounds 1 --group baseline --task 0
+```
+
+**输出 CSV 列**
+
+`任务 | 轮次 | 组别 | 输入tokens | 输出tokens | 总tokens | 安全违规数 | foundation是否变 | 备注`
+
+可用 Excel 打开 `experiment_results.csv`，按「组别」筛选后算平均 tokens、违规数，并画「轮次 vs 总 tokens」折线图。
+
+**预期结论（参考）**
+
+- 第 1 轮：实验组可能多约 20% tokens（多层校验）。
+- 第 2 轮及以后：实验组因复用 foundation/缓存，可节省约 50%～70% tokens。
+- 安全：基线组常见 1～3 处 Bandit 违规，实验组目标 0 处。
+- 基座：实验组 `foundation.json` 一旦生成即不变（后续轮次为「否」）。
+

@@ -1,0 +1,2 @@
+[console_scripts]
+safe-codegen = safe_codegen.runner:main
